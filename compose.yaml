@@ -10,4 +10,6 @@ services:
     ports:
       - '${DB_PORT}:5432'
     volumes:
-      - D:/innowise/var/lib/postgresql/data
+      - type: bind
+        source: D:/innowise/pgdata
+        target: /var/lib/postgresql/data
