@@ -21,6 +21,11 @@ public record UserDto(
         LocalDate birthDate,
         @NotBlank @Email
         String email,
-        @Valid
-        List<CardDto> cards) {
+        @Valid @Size(max = 5)
+        List<CardDto> cards,
+        @NotBlank
+        boolean active) {
+        public UserDto withActive(boolean active){
+                return new UserDto(this.id,this.name,this.surname,this.birthDate,this.email,this.cards, active);
+        }
 }

@@ -14,5 +14,10 @@ public record CardDto(Long id,
                       @NotBlank @Pattern(regexp = "^[A-Z]+(?:\\s+[A-Z]+)*$")
                       String holder,
                       @NotBlank @Future
-                      LocalDate expirationDate) {
+                      LocalDate expirationDate,
+                      @NotBlank
+                      boolean active) {
+    public CardDto withActive(boolean active){
+        return new CardDto(this.id,this.userId,this.number,this.holder,this.expirationDate,active);
+    }
 }

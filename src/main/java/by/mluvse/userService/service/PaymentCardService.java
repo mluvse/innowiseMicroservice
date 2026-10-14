@@ -1,7 +1,6 @@
 package by.mluvse.userService.service;
 
 import by.mluvse.userService.dto.CardDto;
-import by.mluvse.userService.dto.UserDto;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 
@@ -13,7 +12,7 @@ public interface PaymentCardService {
 
      Optional<CardDto> getById(Long id);
 
-     Optional<Page<UserDto>> getAll(String name, String surname, Pageable pageable);
+     Page<CardDto> getAll(String name, String surname, Pageable pageable);
 
      CardDto update(Long id, CardDto dto);
 

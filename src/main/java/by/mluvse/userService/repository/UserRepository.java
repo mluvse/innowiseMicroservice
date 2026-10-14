@@ -6,14 +6,16 @@ import org.springframework.data.jpa.repository.JpaSpecificationExecutor;
 import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
+import org.springframework.stereotype.Repository;
 
-import java.util.Optional;
 
+
+@Repository
 public interface UserRepository extends JpaRepository<User,Long>, JpaSpecificationExecutor<User> {
-    Optional<User> findByEmail(String email);
-    boolean existsByEmail(String email);
 
     @Modifying(clearAutomatically = true)
     @Query(value = "update users set active = :active, updated_at= now() where id =:id", nativeQuery = true)
     int setActive(@Param("id") Long id, @Param("active") boolean active);
+
+    boolean existsByEmail( String email);
 }

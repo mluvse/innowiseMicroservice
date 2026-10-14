@@ -15,7 +15,11 @@ public interface UserMapper {
     @Mapping(target = "updatedAt", ignore = true)
     User toEntity(UserDto dto);
 
-    void updateEntity(UserDto dto, @MappingTarget User user);
+    @Mapping(target = "id", ignore = true)
+    @Mapping(target = "createdAt", ignore = true)
+    @Mapping(target = "updatedAt", ignore = true)
+    @Mapping(target = "cards", ignore = true)
+    User updateEntity(UserDto dto, @MappingTarget User user);
 
     @AfterMapping
     default void linkCards(@MappingTarget User user){
