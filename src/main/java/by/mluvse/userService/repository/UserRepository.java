@@ -1,6 +1,6 @@
-package by.mluvse.innowiseMicroservice.repository;
+package by.mluvse.userService.repository;
 
-import by.mluvse.innowiseMicroservice.entity.User;
+import by.mluvse.userService.entity.User;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.JpaSpecificationExecutor;
 import org.springframework.data.jpa.repository.Modifying;

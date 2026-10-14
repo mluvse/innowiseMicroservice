@@ -1,6 +1,6 @@
-package by.mluvse.innowiseMicroservice.service;
+package by.mluvse.userService.dto;
 
-import by.mluvse.innowiseMicroservice.entity.PaymentCard;
+import by.mluvse.userService.entity.PaymentCard;
 import org.mapstruct.Mapper;
 import org.mapstruct.Mapping;
 import org.mapstruct.MappingTarget;

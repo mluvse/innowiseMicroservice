@@ -1,6 +1,7 @@
-package by.mluvse.innowiseMicroservice.repository;
+package by.mluvse.userService.repository;
 
-import by.mluvse.innowiseMicroservice.entity.PaymentCard;
+import by.mluvse.userService.entity.PaymentCard;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.JpaSpecificationExecutor;
 import org.springframework.data.jpa.repository.Modifying;

@@ -1,4 +1,4 @@
-package by.mluvse.innowiseMicroservice.exceptions;
+package by.mluvse.userService.exceptions;
 
 public class CardLimitException extends RuntimeException {
     public CardLimitException(String message) {

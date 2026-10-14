@@ -1,4 +1,4 @@
-package by.mluvse.innowiseMicroservice.entity;
+package by.mluvse.userService.entity;
 
 import jakarta.persistence.*;
 import lombok.*;

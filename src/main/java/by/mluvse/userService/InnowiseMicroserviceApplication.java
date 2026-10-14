@@ -1,4 +1,4 @@
-package by.mluvse.innowiseMicroservice;
+package by.mluvse.userService;
 
 import org.springframework.boot.SpringApplication;
 import org.springframework.boot.autoconfigure.SpringBootApplication;

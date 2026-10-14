@@ -1,6 +1,6 @@
-package by.mluvse.innowiseMicroservice.specification;
+package by.mluvse.userService.specification;
 
-import by.mluvse.innowiseMicroservice.entity.PaymentCard;
+import by.mluvse.userService.entity.PaymentCard;
 import org.springframework.data.jpa.domain.Specification;
 
 public class PaymentCardSpecification {

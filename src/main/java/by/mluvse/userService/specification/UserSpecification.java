@@ -1,6 +1,6 @@
-package by.mluvse.innowiseMicroservice.specification;
+package by.mluvse.userService.specification;
 
-import by.mluvse.innowiseMicroservice.entity.User;
+import by.mluvse.userService.entity.User;
 import org.springframework.data.jpa.domain.Specification;
 
 public class UserSpecification {

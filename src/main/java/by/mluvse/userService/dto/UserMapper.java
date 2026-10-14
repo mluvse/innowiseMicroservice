@@ -1,7 +1,7 @@
-package by.mluvse.innowiseMicroservice.service;
+package by.mluvse.userService.dto;
 
-import by.mluvse.innowiseMicroservice.entity.PaymentCard;
-import by.mluvse.innowiseMicroservice.entity.User;
+import by.mluvse.userService.entity.PaymentCard;
+import by.mluvse.userService.entity.User;
 import org.mapstruct.*;
 
 @Mapper(componentModel ="spring", unmappedTargetPolicy = ReportingPolicy.WARN, uses = PaymentCardMapper.class)
