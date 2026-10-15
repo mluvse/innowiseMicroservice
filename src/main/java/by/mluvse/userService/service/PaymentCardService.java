@@ -16,7 +16,7 @@ public interface PaymentCardService {
 
      CardDto update(Long id, CardDto dto);
 
-     void changeStatus(Long id,boolean status);
+     CardDto changeStatus(Long id,boolean status);
 
      void delete(Long id);
 

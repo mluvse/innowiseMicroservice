@@ -15,7 +15,7 @@ public interface UserRepository extends JpaRepository<User,Long>, JpaSpecificati
 
     @Modifying(clearAutomatically = true)
     @Query(value = "update users set active = :active, updated_at= now() where id =:id", nativeQuery = true)
-    int setActive(@Param("id") Long id, @Param("active") boolean active);
+    void setActive(@Param("id") Long id, @Param("active") boolean active);
 
     boolean existsByEmail( String email);
 }

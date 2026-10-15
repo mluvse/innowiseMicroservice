@@ -4,6 +4,7 @@ import jakarta.validation.constraints.Future;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.Pattern;
 
+import java.io.Serializable;
 import java.time.LocalDate;
 
 public record CardDto(Long id,
@@ -16,8 +17,8 @@ public record CardDto(Long id,
                       @NotBlank @Future
                       LocalDate expirationDate,
                       @NotBlank
-                      boolean active) {
-    public CardDto withActive(boolean active){
-        return new CardDto(this.id,this.userId,this.number,this.holder,this.expirationDate,active);
+                      boolean active) implements Serializable {
+    public void withActive(boolean active){
+        new CardDto(this.id, this.userId, this.number, this.holder, this.expirationDate, active);
     }
 }

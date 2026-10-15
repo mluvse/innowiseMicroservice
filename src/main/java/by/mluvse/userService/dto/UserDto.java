@@ -6,6 +6,7 @@ import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.Past;
 import jakarta.validation.constraints.Size;
 
+import java.io.Serializable;
 import java.time.LocalDate;
 import java.util.List;
 
@@ -24,8 +25,8 @@ public record UserDto(
         @Valid @Size(max = 5)
         List<CardDto> cards,
         @NotBlank
-        boolean active) {
-        public UserDto withActive(boolean active){
-                return new UserDto(this.id,this.name,this.surname,this.birthDate,this.email,this.cards, active);
+        boolean active)  implements Serializable {
+        public void withActive(boolean active){
+                new UserDto(this.id, this.name, this.surname, this.birthDate, this.email, this.cards, active);
         }
 }

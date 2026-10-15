@@ -7,7 +7,7 @@ import org.mapstruct.*;
 @Mapper(componentModel ="spring", unmappedTargetPolicy = ReportingPolicy.WARN, uses = PaymentCardMapper.class)
 public interface UserMapper {
 
-
+    @Mapping(target = "withActive", ignore = true)
     UserDto toDto(User user);
 
     @Mapping(target = "id", ignore = true)
