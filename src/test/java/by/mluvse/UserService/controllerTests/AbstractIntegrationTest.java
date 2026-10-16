@@ -14,37 +14,32 @@ import org.springframework.test.context.DynamicPropertySource;
 import org.springframework.test.web.servlet.MockMvc;
 import org.testcontainers.containers.GenericContainer;
 import org.testcontainers.containers.PostgreSQLContainer;
+import org.testcontainers.containers.wait.strategy.Wait;
 import org.testcontainers.junit.jupiter.Container;
 import org.testcontainers.junit.jupiter.Testcontainers;
 import tools.jackson.databind.ObjectMapper;
 
+import java.time.Duration;
 import java.util.Optional;
 
-@SpringBootTest(properties = {
-        "spring.docker.compose.enabled=false",
-        "spring.cache.type=redis",
-        "spring.data.redis.timeout=5s",
-        "spring.data.redis.connect-timeout=5s"
-})
+@SpringBootTest
 @AutoConfigureMockMvc
 @Testcontainers
 public abstract class AbstractIntegrationTest {
 
     @Container
     @ServiceConnection
-    static PostgreSQLContainer<?> postgres = new PostgreSQLContainer<>("postgres:16-alpine");
+    static PostgreSQLContainer<?> postgres = new PostgreSQLContainer<>("postgres:16-alpine")
+            .withDatabaseName("testdb")
+            .withUsername("test")
+            .withPassword("test");
 
     @Container
     static GenericContainer<?> redis = new GenericContainer<>("redis:7-alpine")
             .withExposedPorts(6379)
-            .withReuse(true);
+            .waitingFor(Wait.forLogMessage(".*Ready to accept connections.*\\n", 1))
+            .withStartupTimeout(Duration.ofSeconds(60));
 
-    @DynamicPropertySource
-    static void redisProperties(DynamicPropertyRegistry registry) {
-        registry.add("spring.data.redis.host", redis::getHost);
-        registry.add("spring.data.redis.port", () -> redis.getMappedPort(6379));
-        registry.add("spring.data.redis.password", () -> "");
-    }
 
     @Autowired
     protected MockMvc mockMvc;
@@ -65,18 +60,21 @@ public abstract class AbstractIntegrationTest {
     void cleanUp() {
         userRepository.deleteAll();
 
-        // Очищаем кэш только если Redis доступен
         if (cacheManager != null && isRedisAvailable()) {
-            cacheManager.getCacheNames().forEach(name -> {
-                Optional.ofNullable(cacheManager.getCache(name))
-                        .ifPresent(Cache::clear);
-            });
+            try {
+                cacheManager.getCacheNames().forEach(name -> {
+                    Optional.ofNullable(cacheManager.getCache(name))
+                            .ifPresent(Cache::clear);
+                });
+            } catch (Exception e) {
+                // Игнорируем ошибки очистки кэша
+            }
         }
     }
 
-    private boolean isRedisAvailable() {
+    protected boolean isRedisAvailable() {
+        if (redisConnectionFactory == null) return false;
         try {
-            if (redisConnectionFactory == null) return false;
             redisConnectionFactory.getConnection().ping();
             return true;
         } catch (Exception e) {
@@ -85,7 +83,7 @@ public abstract class AbstractIntegrationTest {
     }
 
     protected boolean isUserCached(Long userId) {
-        if (cacheManager == null || !isRedisAvailable()) return false;
+        if (!isRedisAvailable()) return false;
         try {
             Cache cache = cacheManager.getCache("users");
             return cache != null && cache.get(userId) != null;
@@ -95,7 +93,7 @@ public abstract class AbstractIntegrationTest {
     }
 
     protected boolean isCardCached(Long cardId) {
-        if (cacheManager == null || !isRedisAvailable()) return false;
+        if (!isRedisAvailable()) return false;
         try {
             Cache cache = cacheManager.getCache("payment_cards");
             return cache != null && cache.get(cardId) != null;
