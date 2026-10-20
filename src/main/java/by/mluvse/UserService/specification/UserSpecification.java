@@ -5,6 +5,10 @@ import org.springframework.data.jpa.domain.Specification;
 
 public class UserSpecification {
 
+    private UserSpecification(){
+
+    }
+
     public static Specification<User> nameContains(String name){
         return (root, query, criteriaBuilder) -> name==null|| name.isBlank() ?
                 criteriaBuilder.conjunction():

@@ -5,8 +5,12 @@ import org.springframework.data.jpa.domain.Specification;
 
 public class PaymentCardSpecification {
 
+    private PaymentCardSpecification(){
+
+    }
+
     public static Specification<PaymentCard> containsName(String name){
-        return (root, query, criteriaBuilder) -> name==null|name.isBlank() ?
+        return (root, query, criteriaBuilder) -> name==null||name.isBlank() ?
                 criteriaBuilder.conjunction() :
                 criteriaBuilder.like(criteriaBuilder.lower(root.get("user").get("name")), "%"+ name.toLowerCase()+"%");
 

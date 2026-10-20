@@ -30,6 +30,7 @@ public class UserServiceImpl  implements UserService{
     private final UserMapper mapper;
     private final PaymentCardMapper cardMapper;
     private static final int MAX_CARDS_PER_USER = 5;
+    private static final String USER_NOT_FOUND="User not found: ";
 
 
     @Override
@@ -51,7 +52,7 @@ public class UserServiceImpl  implements UserService{
     @Cacheable(value = "users", key = "#id")
     public UserDto getById(Long id) {
         return repository.findById(id).map(mapper::toDto)
-                .orElseThrow(() -> new NotFoundException("User not found: " + id));
+                .orElseThrow(() -> new NotFoundException(USER_NOT_FOUND+ id));
     }
 
     @Override
@@ -66,7 +67,7 @@ public class UserServiceImpl  implements UserService{
     @Transactional
     public List<CardDto> getCards(Long id) {
         User user = repository.findById(id)
-                .orElseThrow(() -> new NotFoundException("User not found: " + id));
+                .orElseThrow(() -> new NotFoundException(USER_NOT_FOUND+ id));
         return user.getCards().stream().map(cardMapper::toDto).toList();
 
     }
@@ -76,7 +77,7 @@ public class UserServiceImpl  implements UserService{
     @CachePut(value = "users", key = "#id")
     public UserDto update(Long id, UserDto dto) {
         User user= repository.findById(id)
-                .orElseThrow(()-> new NotFoundException("User not found"));
+                .orElseThrow(()-> new NotFoundException(USER_NOT_FOUND));
         mapper.updateEntity(dto, user);
         return mapper.toDto(user);
     }

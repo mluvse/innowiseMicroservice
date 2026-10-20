@@ -13,7 +13,7 @@ public record CardDto(Long id,
                       Long userId,
                       @NotBlank @Pattern(regexp = "^\\d{13,19}$")
                       String number,
-                      @NotBlank @Pattern(regexp = "^[A-Z]+(?:\\s+[A-Z]+)*$")
+                      @NotBlank
                       String holder,
                       @NotNull @Future
                       LocalDate expirationDate,
