@@ -18,6 +18,6 @@ public class UserSpecification {
     public static Specification<User> surnameContains(String surname){
         return (root, query, cb) -> surname==null|| surname.isBlank() ?
         cb.conjunction() :
-        cb.like(cb.lower(root.get("name")),"%"+surname.toLowerCase()+"%")   ;
+        cb.like(cb.lower(root.get("surname")),"%"+surname.toLowerCase()+"%")   ;
     }
 }

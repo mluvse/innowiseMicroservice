@@ -8,6 +8,7 @@ import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 
 
@@ -18,8 +19,10 @@ public class PaymentCardController {
 
     private final PaymentCardService cardService;
 
+
     public PaymentCardController(PaymentCardService cardService) {
         this.cardService = cardService;
+
     }
 
     @PostMapping
@@ -33,6 +36,7 @@ public class PaymentCardController {
     }
 
     @GetMapping
+    @PreAuthorize("hasRole('ADMIN')")
     public ResponseEntity<Page<CardDto>> getAll(@RequestParam(required = false) String name,
                                                 @RequestParam(required = false) String surname,
                                                 Pageable pageable){
@@ -40,17 +44,20 @@ public class PaymentCardController {
     }
 
     @PutMapping("/{id}")
+    @PreAuthorize("hasRole('ADMIN')")
     public ResponseEntity<CardDto> update(@PathVariable Long id,
                                           @Valid @RequestBody CardDto dto) {
         return ResponseEntity.ok(cardService.update(id, dto));
     }
     @PatchMapping("/{id}/activate")
+    @PreAuthorize("hasRole('ADMIN')")
     public ResponseEntity<CardDto> activate(@PathVariable Long id){
         return ResponseEntity.ok(cardService.changeStatus(id, true));
 
     }
 
     @PatchMapping("/{id}/deactivate")
+    @PreAuthorize("hasRole('ADMIN')")
     public ResponseEntity<CardDto> deactivate(@PathVariable Long id){
         return ResponseEntity.ok(cardService.changeStatus(id, false));
     }

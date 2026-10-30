@@ -2,7 +2,7 @@ name: CI Pipeline
 
 on:
   push:
-    branches: [ main ]
+  pull_request:
 
 jobs:
   build:
@@ -10,24 +10,29 @@ jobs:
 
     steps:
       - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
 
       - name: Set up JDK
         uses: actions/setup-java@v4
         with:
           java-version: '25'
           distribution: 'temurin'
+          cache: maven
 
-      - name: Build
-        run: mvn clean compile
+      - name: Build and test
+        run:  mvn -B verify
 
       - name: Testing
         run: mvn test
 
-      - name: SonarQube Analysis
+      - name: Sonar
         env:
           SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
           SONAR_HOST_URL: ${{ secrets.SONAR_HOST_URL }}
-        run: mvn sonar:sonar -Dsonar.login=$SONAR_TOKEN -Dsonar.host.url=$SONAR_HOST_URL
+        run: >
+          mvn -B org.sonarsource.scanner.maven:sonar-maven-plugin:sonar
+          -Dsonar.token=${{ secrets.SONAR_TOKEN }}
 
       - name: Build Docker Image
         run: docker build -t userservice:latest .

@@ -2,6 +2,7 @@ package by.mluvse.UserService.serviceTests;
 
 import by.mluvse.UserService.dto.CardDto;
 import by.mluvse.UserService.dto.PaymentCardMapper;
+import by.mluvse.UserService.entity.AuthUser;
 import by.mluvse.UserService.entity.PaymentCard;
 import by.mluvse.UserService.entity.User;
 import by.mluvse.UserService.exceptions.CardLimitException;
@@ -21,6 +22,7 @@ import org.springframework.data.domain.PageImpl;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.domain.Specification;
+import org.springframework.security.access.AccessDeniedException;
 
 import java.time.LocalDate;
 import java.util.List;
@@ -31,18 +33,18 @@ import static org.mockito.Mockito.*;
 
 @ExtendWith(MockitoExtension.class)
 public class PaymentServiceTest {
-    @Mock
-    PaymentCardRepository repository;
-    @Mock
-    UserRepository userRepository;
-    @Mock
-    PaymentCardMapper mapper;
-    @InjectMocks
-    PaymentCardServiceImpl service;
+
+    @Mock PaymentCardRepository repository;
+    @Mock UserRepository userRepository;
+    @Mock PaymentCardMapper mapper;
+    @InjectMocks PaymentCardServiceImpl service;
 
     private User testUser;
     private PaymentCard testCard;
     private CardDto testCardDto;
+    private final AuthUser admin = new AuthUser(0L, "ADMIN");
+    private final AuthUser owner = new AuthUser(1L, "USER");
+    private final AuthUser stranger = new AuthUser(2L, "USER");
 
     @BeforeEach
     void setUp() {
@@ -73,36 +75,38 @@ public class PaymentServiceTest {
         when(repository.save(newCard)).thenReturn(newCard);
         when(mapper.toDto(newCard)).thenReturn(testCardDto);
 
-        CardDto result = service.create(testCardDto);
+        CardDto result = service.create(1L, testCardDto, owner);
 
         assertEquals(testCardDto, result);
         assertSame(testUser, newCard.getUser());
-        verify(repository).save(newCard);
     }
 
     @Test
-    void create_whenUserNotFound_throwsNotFoundException() {
+    void create_whenUserNotFound_throws() {
         when(userRepository.findById(1L)).thenReturn(Optional.empty());
-
-        assertThrows(NotFoundException.class, () -> service.create(testCardDto));
+        assertThrows(NotFoundException.class, () -> service.create(1L, testCardDto, admin));
         verify(repository, never()).save(any());
     }
 
     @Test
-    void create_whenNumberExists_throwsDuplicateResourceException() {
+    void create_forAnotherUser_throwsAccessDenied() {
+        assertThrows(AccessDeniedException.class, () -> service.create(1L, testCardDto, stranger));
+        verify(repository, never()).save(any());
+    }
+
+    @Test
+    void create_whenNumberExists_throwsDuplicate() {
         when(userRepository.findById(1L)).thenReturn(Optional.of(testUser));
         when(repository.existsByNumber(testCardDto.number())).thenReturn(true);
-
-        assertThrows(DuplicateResourceException.class, () -> service.create(testCardDto));
+        assertThrows(DuplicateResourceException.class, () -> service.create(1L, testCardDto, owner));
         verify(repository, never()).save(any());
     }
 
     @Test
-    void create_whenUserHasFiveCards_throwsCardLimitException() {
+    void create_whenFiveActiveCards_throwsLimit() {
         when(userRepository.findById(1L)).thenReturn(Optional.of(testUser));
-        when(repository.countByUserId(1L)).thenReturn(5L);
-
-        assertThrows(CardLimitException.class, () -> service.create(testCardDto));
+        when(repository.countByUserIdAndActiveTrue(1L)).thenReturn(5L);
+        assertThrows(CardLimitException.class, () -> service.create(1L, testCardDto, owner));
         verify(repository, never()).save(any());
     }
 
@@ -110,18 +114,20 @@ public class PaymentServiceTest {
     void getById_whenFound_returnsDto() {
         when(repository.findById(10L)).thenReturn(Optional.of(testCard));
         when(mapper.toDto(testCard)).thenReturn(testCardDto);
-
-        Optional<CardDto> result = service.getById(10L);
-
-        assertTrue(result.isPresent());
-        assertEquals(testCardDto, result.get());
+        assertEquals(testCardDto, service.getById(10L, owner));
     }
 
     @Test
-    void getById_whenNotFound_returnsEmpty() {
+    void getById_whenNotFound_throws() {
         when(repository.findById(10L)).thenReturn(Optional.empty());
+        assertThrows(NotFoundException.class, () -> service.getById(10L, admin));
+    }
 
-        assertTrue(service.getById(10L).isEmpty());
+    @Test
+    void getById_stranger_throwsAccessDenied() {
+        when(repository.findById(10L)).thenReturn(Optional.of(testCard));
+        assertThrows(AccessDeniedException.class, () -> service.getById(10L, stranger));
+        verify(mapper, never()).toDto(any());
     }
 
     @Test
@@ -142,73 +148,93 @@ public class PaymentServiceTest {
         when(repository.findById(10L)).thenReturn(Optional.of(testCard));
         when(mapper.toDto(testCard)).thenReturn(testCardDto);
 
-        CardDto result = service.update(10L, testCardDto);
+        CardDto result = service.update(10L, testCardDto, owner);
 
         assertEquals(testCardDto, result);
         verify(mapper).updateEntity(testCardDto, testCard);
     }
 
     @Test
-    void update_whenCardNotFound_throwsNotFoundException() {
+    void update_whenCardNotFound_throws() {
         when(repository.findById(10L)).thenReturn(Optional.empty());
-
-        assertThrows(NotFoundException.class, () -> service.update(10L, testCardDto));
+        assertThrows(NotFoundException.class, () -> service.update(10L, testCardDto, admin));
         verify(mapper, never()).updateEntity(any(), any());
     }
 
     @Test
-    void update_whenNumberBelongsToAnotherCard_throws() {
+    void update_stranger_throwsAccessDenied() {
+        when(repository.findById(10L)).thenReturn(Optional.of(testCard));
+        assertThrows(AccessDeniedException.class, () -> service.update(10L, testCardDto, stranger));
+        verify(mapper, never()).updateEntity(any(), any());
+    }
+
+    @Test
+    void update_numberBelongsToAnotherCard_throwsDuplicate() {
         CardDto other = new CardDto(10L, 1L, "5555555555554444", "IVAN PETROV",
                 LocalDate.of(2030, 12, 31), true);
         when(repository.findById(10L)).thenReturn(Optional.of(testCard));
         when(repository.existsByNumber("5555555555554444")).thenReturn(true);
 
-        assertThrows(IllegalArgumentException.class, () -> service.update(10L, other));
+        assertThrows(DuplicateResourceException.class, () -> service.update(10L, other, owner));
         verify(mapper, never()).updateEntity(any(), any());
     }
 
     @Test
-    void changeStatus_whenDifferent_updatesAndReturnsDto() {
+    void changeStatus_deactivate_updatesAndReturnsDto() {
         CardDto deactivated = new CardDto(10L, 1L, "4111111111111111", "IVAN PETROV",
                 LocalDate.of(2030, 12, 31), false);
-        when(repository.findById(10L)).thenReturn(Optional.of(testCard)); // active = true
+        when(repository.findById(10L)).thenReturn(Optional.of(testCard));
         when(mapper.toDto(testCard)).thenReturn(deactivated);
 
-        CardDto result = service.changeStatus(10L, false);
+        CardDto result = service.changeStatus(10L, false, owner);
 
-        assertFalse(testCard.isActive());
+        verify(repository).setActive(10L, false);
         assertFalse(result.active());
     }
 
     @Test
-    void changeStatus_whenStatusAlreadySet_throwsIllegalArgumentException() {
+    void changeStatus_activate_whenFiveActive_throwsLimit() {
+        testCard.setActive(false);
         when(repository.findById(10L)).thenReturn(Optional.of(testCard));
+        when(repository.countByUserIdAndActiveTrue(1L)).thenReturn(5L);
 
-        assertThrows(IllegalArgumentException.class, () -> service.changeStatus(10L, true));
-        verify(mapper, never()).toDto(any());
+        assertThrows(CardLimitException.class, () -> service.changeStatus(10L, true, owner));
+        verify(repository, never()).setActive(anyLong(), anyBoolean());
     }
 
     @Test
-    void changeStatus_whenCardNotFound_throwsNotFoundException() {
+    void changeStatus_sameStatus_throwsIllegalArgument() {
+        when(repository.findById(10L)).thenReturn(Optional.of(testCard));
+        assertThrows(IllegalArgumentException.class, () -> service.changeStatus(10L, true, owner));
+        verify(repository, never()).setActive(anyLong(), anyBoolean());
+    }
+
+    @Test
+    void changeStatus_notFound_throws() {
         when(repository.findById(10L)).thenReturn(Optional.empty());
-
-        assertThrows(NotFoundException.class, () -> service.changeStatus(10L, false));
+        assertThrows(NotFoundException.class, () -> service.changeStatus(10L, false, admin));
     }
 
     @Test
-    void delete_whenCardExists_removesCardFromUser() {
+    void delete_removesCardFromUser() {
         when(repository.findById(10L)).thenReturn(Optional.of(testCard));
 
-        service.delete(10L);
+        service.delete(10L, owner);
 
         assertFalse(testUser.getCards().contains(testCard));
         assertNull(testCard.getUser());
     }
 
     @Test
-    void delete_whenCardNotFound_throwsNotFoundException() {
-        when(repository.findById(10L)).thenReturn(Optional.empty());
+    void delete_stranger_throwsAccessDenied() {
+        when(repository.findById(10L)).thenReturn(Optional.of(testCard));
+        assertThrows(AccessDeniedException.class, () -> service.delete(10L, stranger));
+        assertTrue(testUser.getCards().contains(testCard));
+    }
 
-        assertThrows(NotFoundException.class, () -> service.delete(10L));
+    @Test
+    void delete_notFound_throws() {
+        when(repository.findById(10L)).thenReturn(Optional.empty());
+        assertThrows(NotFoundException.class, () -> service.delete(10L, admin));
     }
 }

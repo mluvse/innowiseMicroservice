@@ -8,6 +8,7 @@ import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 
 
@@ -29,11 +30,13 @@ public class UserController {
     }
 
     @GetMapping("/{id}")
+    @PreAuthorize("hasRole('ADMIN') or #id == authentication.principal.userId")
     public ResponseEntity<UserDto> get(@PathVariable Long id){
         return ResponseEntity.ok(userService.getById(id));
     }
 
     @GetMapping
+    @PreAuthorize("hasRole('ADMIN')")
     public ResponseEntity<Page<UserDto>> getAll(@RequestParam(required = false) String name,
                                                 @RequestParam(required = false) String surname,
                                                 Pageable pageable){
@@ -41,6 +44,7 @@ public class UserController {
     }
 
     @GetMapping("/{id}/cards")
+    @PreAuthorize("hasRole('ADMIN') or #id == authentication.principal.userId")
     public ResponseEntity<List<CardDto>> getCards(@PathVariable Long id){
         return ResponseEntity.ok(userService.getCards(id));
     }
@@ -51,16 +55,19 @@ public class UserController {
     }
 
     @PatchMapping("/{id}/activate")
+    @PreAuthorize("hasRole('ADMIN')")
     public ResponseEntity<UserDto> activate(@PathVariable Long id){
         return ResponseEntity.ok(userService.changeStatus(id,true));
     }
 
     @PatchMapping("/{id}/deactivate")
+    @PreAuthorize("hasRole('ADMIN')")
     public ResponseEntity<UserDto> deactivate(@PathVariable Long id){
         return ResponseEntity.ok(userService.changeStatus(id, false));
     }
 
-    @DeleteMapping("/delete/{id}")
+    @DeleteMapping("/{id}")
+    @PreAuthorize("hasRole('ADMIN')")
     public ResponseEntity<Void> delete(@PathVariable Long id){
         userService.delete(id);
         return ResponseEntity.status(200).build();

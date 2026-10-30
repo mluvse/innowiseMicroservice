@@ -11,241 +11,247 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 @DisplayName("PaymentCard Controller Integration Tests")
 class PaymentCardControllerTest extends AbstractIntegrationTest {
 
-    private static final String VALID_NUMBER = "4111111111111111";
-    private static final String VALID_HOLDER = "IVAN PETROV";
+    private static final String NUMBER = "4111111111111111";
+    private static final String HOLDER = "IVAN PETROV";
 
-    private long createUser(String email) throws Exception {
+    private long createUser(String name, String surname, String email) throws Exception {
         String json = """
-            {
-                "name": "Ivan",
-                "surname": "Petrov",
-                "birthDate": "1995-05-20",
-                "email": "%s",
-                "active": true,
-                "cards": []
-            }
-            """.formatted(email);
-
-        String response = mockMvc.perform(post("/api/users")
-                        .contentType(MediaType.APPLICATION_JSON)
-                        .content(json))
+            {"name":"%s","surname":"%s","birthDate":"1995-05-20","email":"%s"}
+            """.formatted(name, surname, email);
+        String body = mockMvc.perform(post("/api/users").with(asAdmin())
+                        .contentType(MediaType.APPLICATION_JSON).content(json))
                 .andExpect(status().isCreated())
-                .andExpect(jsonPath("$.id").isNumber())
-                .andReturn()
-                .getResponse()
-                .getContentAsString();
-
-        return objectMapper.readTree(response).get("id").asLong();
+                .andReturn().getResponse().getContentAsString();
+        return objectMapper.readTree(body).get("id").asLong();
     }
 
-    private String cardJson(long userId, String number, String holder) {
+    private long createUser(String email) throws Exception {
+        return createUser("Ivan", "Petrov", email);
+    }
+
+    private String cardJson(String number, String holder) {
         return """
-            {
-                "userId": %d,
-                "number": "%s",
-                "holder": "%s",
-                "expirationDate": "2030-12-31",
-                "active": true
-            }
-            """.formatted(userId, number, holder);
+            {"number":"%s","holder":"%s","expirationDate":"2030-12-31"}
+            """.formatted(number, holder);
     }
 
     private long createCard(long userId, String number) throws Exception {
-        String response = mockMvc.perform(post("/api/cards")
+        String body = mockMvc.perform(post("/api/users/{id}/cards", userId).with(asAdmin())
                         .contentType(MediaType.APPLICATION_JSON)
-                        .content(cardJson(userId, number, VALID_HOLDER)))
+                        .content(cardJson(number, HOLDER)))
                 .andExpect(status().isCreated())
-                .andExpect(jsonPath("$.id").isNumber())
-                .andReturn()
-                .getResponse()
-                .getContentAsString();
-
-        return objectMapper.readTree(response).get("id").asLong();
+                .andReturn().getResponse().getContentAsString();
+        return objectMapper.readTree(body).get("id").asLong();
     }
 
     @Test
-    @DisplayName("POST /api/cards")
-    void createCard_Returns201() throws Exception {
+    void createCard_returns201_activeByDefault() throws Exception {
         long userId = createUser("ivan@mail.com");
-
-        mockMvc.perform(post("/api/cards")
+        mockMvc.perform(post("/api/users/{id}/cards", userId).with(asAdmin())
                         .contentType(MediaType.APPLICATION_JSON)
-                        .content(cardJson(userId, VALID_NUMBER, VALID_HOLDER)))
+                        .content(cardJson(NUMBER, HOLDER)))
                 .andExpect(status().isCreated())
-                .andExpect(jsonPath("$.id").isNumber())
                 .andExpect(jsonPath("$.userId").value(userId))
-                .andExpect(jsonPath("$.number").value(VALID_NUMBER))
-                .andExpect(jsonPath("$.holder").value(VALID_HOLDER))
+                .andExpect(jsonPath("$.number").value(NUMBER))
                 .andExpect(jsonPath("$.active").value(true));
     }
 
     @Test
-    @DisplayName("POST /api/cards")
-    void createCard_UserNotFound_Returns404() throws Exception {
-        mockMvc.perform(post("/api/cards")
+    void createCard_userNotFound_returns404() throws Exception {
+        mockMvc.perform(post("/api/users/{id}/cards", 999999).with(asAdmin())
                         .contentType(MediaType.APPLICATION_JSON)
-                        .content(cardJson(999999L, VALID_NUMBER, VALID_HOLDER)))
+                        .content(cardJson(NUMBER, HOLDER)))
                 .andExpect(status().isNotFound());
     }
 
     @Test
-    @DisplayName("POST /api/cards")
-    void createCard_DuplicateNumber_Returns409() throws Exception {
+    void createCard_duplicateNumber_returns409() throws Exception {
         long userId = createUser("ivan@mail.com");
-        createCard(userId, VALID_NUMBER);
-
-        mockMvc.perform(post("/api/cards")
+        createCard(userId, NUMBER);
+        mockMvc.perform(post("/api/users/{id}/cards", userId).with(asAdmin())
                         .contentType(MediaType.APPLICATION_JSON)
-                        .content(cardJson(userId, VALID_NUMBER, VALID_HOLDER)))
+                        .content(cardJson(NUMBER, HOLDER)))
                 .andExpect(status().isConflict());
     }
 
     @Test
-    @DisplayName("POST /api/cards")
-    void createCard_SixthCard_Returns400() throws Exception {
+    void createCard_sixthActiveCard_returns400() throws Exception {
         long userId = createUser("ivan@mail.com");
-
-        // Создаем 5 карт (максимум)
         for (int i = 0; i < 5; i++) {
             createCard(userId, "411111111111111" + i);
         }
-
-        mockMvc.perform(post("/api/cards")
+        mockMvc.perform(post("/api/users/{id}/cards", userId).with(asAdmin())
                         .contentType(MediaType.APPLICATION_JSON)
-                        .content(cardJson(userId, "4111111111111119", VALID_HOLDER)))
+                        .content(cardJson("4111111111111119", HOLDER)))
                 .andExpect(status().isBadRequest());
     }
 
     @Test
-    @DisplayName("POST /api/cards")
-    void createCard_BlankHolder_Returns400() throws Exception {
+    void createCard_inactiveCardsDoNotCountToLimit() throws Exception {
         long userId = createUser("ivan@mail.com");
+        for (int i = 0; i < 5; i++) {
+            long cardId = createCard(userId, "411111111111111" + i);
+            mockMvc.perform(patch("/api/cards/{id}/status", cardId).with(asAdmin())
+                            .param("active", "false"))
+                    .andExpect(status().isOk());
+        }
+        createCard(userId, "4111111111111119");   // должно пройти
+    }
 
-        mockMvc.perform(post("/api/cards")
-                        .contentType(MediaType.APPLICATION_JSON)
-                        .content(cardJson(userId, VALID_NUMBER, "")))
+    @Test
+    void activateCard_whenFiveActive_returns400() throws Exception {
+        long userId = createUser("ivan@mail.com");
+        long first = createCard(userId, "4111111111111110");
+        mockMvc.perform(patch("/api/cards/{id}/status", first).with(asAdmin())
+                .param("active", "false")).andExpect(status().isOk());
+        for (int i = 1; i <= 5; i++) {
+            createCard(userId, "411111111111111" + i);   // 5 активных
+        }
+        mockMvc.perform(patch("/api/cards/{id}/status", first).with(asAdmin())
+                        .param("active", "true"))
                 .andExpect(status().isBadRequest());
     }
 
     @Test
-    @DisplayName("GET /api/cards/{id}")
-    void getCard_Returns200() throws Exception {
+    void createCard_blankHolder_returns400() throws Exception {
         long userId = createUser("ivan@mail.com");
-        long cardId = createCard(userId, VALID_NUMBER);
+        mockMvc.perform(post("/api/users/{id}/cards", userId).with(asAdmin())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(cardJson(NUMBER, "")))
+                .andExpect(status().isBadRequest());
+    }
 
-        mockMvc.perform(get("/api/cards/{id}", cardId))
+    @Test
+    void createCard_forAnotherUser_returns403() throws Exception {
+        long userId = createUser("ivan@mail.com");
+        mockMvc.perform(post("/api/users/{id}/cards", userId).with(asUser(userId + 1, "USER"))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(cardJson(NUMBER, HOLDER)))
+                .andExpect(status().isForbidden());
+    }
+
+    @Test
+    void createCard_refreshesUserCache() throws Exception {
+        long userId = createUser("ivan@mail.com");
+        mockMvc.perform(get("/api/users/{id}", userId).with(asAdmin()))
+                .andExpect(jsonPath("$.cards.length()").value(0));
+        createCard(userId, NUMBER);
+        mockMvc.perform(get("/api/users/{id}", userId).with(asAdmin()))
+                .andExpect(jsonPath("$.cards.length()").value(1));
+    }
+
+    @Test
+    void getCard_returns200_owner_and403_stranger() throws Exception {
+        long userId = createUser("ivan@mail.com");
+        long cardId = createCard(userId, NUMBER);
+        mockMvc.perform(get("/api/cards/{id}", cardId).with(asUser(userId, "USER")))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.id").value(cardId))
-                .andExpect(jsonPath("$.number").value(VALID_NUMBER))
-                .andExpect(jsonPath("$.holder").value(VALID_HOLDER));
+                .andExpect(jsonPath("$.number").value(NUMBER));
+        mockMvc.perform(get("/api/cards/{id}", cardId).with(asUser(userId + 1, "USER")))
+                .andExpect(status().isForbidden());
     }
 
     @Test
-    @DisplayName("GET /api/cards/{id}")
-    void getCard_NotFound_Returns404() throws Exception {
-        mockMvc.perform(get("/api/cards/{id}", 999999))
+    void getCard_notFound_returns404() throws Exception {
+        mockMvc.perform(get("/api/cards/{id}", 999999).with(asAdmin()))
                 .andExpect(status().isNotFound());
     }
 
     @Test
-    @DisplayName("GET /api/cards/{id}")
-    void getCard_Cached() throws Exception {
-        long userId = createUser("ivan@mail.com");
-        long cardId = createCard(userId, VALID_NUMBER);
+    void getAll_filterByOwnerNameAndSurname_withPagination() throws Exception {
+        long u1 = createUser("Ivan", "Petrov", "a@mail.com");
+        long u2 = createUser("Ivan", "Sidorov", "b@mail.com");
+        createCard(u1, "4111111111111111");
+        createCard(u1, "4111111111111112");
+        createCard(u2, "4111111111111113");
 
-        mockMvc.perform(get("/api/cards/{id}", cardId))
-                .andExpect(status().isOk());
-
-        assertTrue(isCardCached(cardId), "Карта должна быть закэширована");
-    }
-
-    @Test
-    @DisplayName("GET /api/cards ")
-    void getAll_FilterByOwnerName() throws Exception {
-        long user1 = createUser("a@mail.com"); // Ivan
-        long user2 = createUser("b@mail.com"); // Ivan
-        createCard(user1, "4111111111111111");
-        createCard(user1, "4111111111111112");
-        createCard(user2, "4111111111111113");
-
-        mockMvc.perform(get("/api/cards")
-                        .param("name", "iva")
-                        .param("surname", "petr")
-                        .param("page", "0")
-                        .param("size", "2"))
+        mockMvc.perform(get("/api/cards").with(asAdmin())
+                        .param("name", "iva").param("surname", "petr")
+                        .param("page", "0").param("size", "1"))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.content").isArray())
-                .andExpect(jsonPath("$.content.length()").value(2))
-                .andExpect(jsonPath("$.totalElements").value(3))
-                .andExpect(jsonPath("$.size").value(2));
+                .andExpect(jsonPath("$.content.length()").value(1))
+                .andExpect(jsonPath("$.totalElements").value(2));
     }
 
     @Test
-    @DisplayName("PUT /api/cards/{id}")
-    void updateCard_ChangesFields() throws Exception {
+    void getAll_userRole_returns403() throws Exception {
+        mockMvc.perform(get("/api/cards").with(asUser(1L, "USER")))
+                .andExpect(status().isForbidden());
+    }
+
+    @Test
+    void updateCard_changesFields_andRefreshesUserCache() throws Exception {
         long userId = createUser("ivan@mail.com");
-        long cardId = createCard(userId, VALID_NUMBER);
+        long cardId = createCard(userId, NUMBER);
+        mockMvc.perform(get("/api/users/{id}", userId).with(asAdmin())).andExpect(status().isOk());
 
-        String updateJson = cardJson(userId, VALID_NUMBER, "PETR IVANOV");
-
-        mockMvc.perform(put("/api/cards/{id}", cardId)
+        mockMvc.perform(put("/api/cards/{id}", cardId).with(asAdmin())
                         .contentType(MediaType.APPLICATION_JSON)
-                        .content(updateJson))
+                        .content(cardJson(NUMBER, "PETR IVANOV")))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.holder").value("PETR IVANOV"));
 
-        mockMvc.perform(get("/api/cards/{id}", cardId))
-                .andExpect(status().isOk())
-                .andExpect(jsonPath("$.holder").value("PETR IVANOV"));
+        mockMvc.perform(get("/api/users/{id}", userId).with(asAdmin()))
+                .andExpect(jsonPath("$.cards[0].holder").value("PETR IVANOV"));
     }
 
     @Test
-    @DisplayName("PATCH /api/cards/{id}/deactivate")
-    void deactivateCard_ChangesStatus() throws Exception {
-        long userId = createUser("ivan@mail.com");
-        long cardId = createCard(userId, VALID_NUMBER);
+    void updateCard_notFound_returns404() throws Exception {
+        mockMvc.perform(put("/api/cards/{id}", 999999).with(asAdmin())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(cardJson(NUMBER, HOLDER)))
+                .andExpect(status().isNotFound());
+    }
 
-        mockMvc.perform(patch("/api/cards/{id}/deactivate", cardId))
+    @Test
+    void updateCard_numberOfAnotherCard_returns409() throws Exception {
+        long userId = createUser("ivan@mail.com");
+        createCard(userId, "4111111111111111");
+        long second = createCard(userId, "4111111111111112");
+        mockMvc.perform(put("/api/cards/{id}", second).with(asAdmin())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(cardJson("4111111111111111", HOLDER)))
+                .andExpect(status().isConflict());
+    }
+
+    @Test
+    void changeStatus_togglesAndRejectsSame() throws Exception {
+        long userId = createUser("ivan@mail.com");
+        long cardId = createCard(userId, NUMBER);
+        mockMvc.perform(patch("/api/cards/{id}/status", cardId).with(asAdmin()).param("active", "false"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.active").value(false));
-
-        mockMvc.perform(patch("/api/cards/{id}/deactivate", cardId))
+        mockMvc.perform(patch("/api/cards/{id}/status", cardId).with(asAdmin()).param("active", "false"))
                 .andExpect(status().isBadRequest());
-    }
-
-    @Test
-    @DisplayName("PATCH /api/cards/{id}/activate ")
-    void activateCard_ChangesStatus() throws Exception {
-        long userId = createUser("ivan@mail.com");
-        long cardId = createCard(userId, VALID_NUMBER);
-
-        mockMvc.perform(patch("/api/cards/{id}/deactivate", cardId))
-                .andExpect(status().isOk());
-
-        mockMvc.perform(patch("/api/cards/{id}/activate", cardId))
-                .andExpect(status().isOk())
+        mockMvc.perform(patch("/api/cards/{id}/status", cardId).with(asAdmin()).param("active", "true"))
                 .andExpect(jsonPath("$.active").value(true));
     }
 
     @Test
-    @DisplayName("DELETE /api/cards/{id}")
-    void deleteCard_RemovesFromCacheAndUser() throws Exception {
-        long userId = createUser("ivan@mail.com");
-        long cardId = createCard(userId, VALID_NUMBER);
-
-        mockMvc.perform(get("/api/cards/{id}", cardId)).andExpect(status().isOk());
-        assertTrue(isCardCached(cardId));
-
-        mockMvc.perform(delete("/api/cards/{id}", cardId))
-                .andExpect(status().isOk());
-
-        assertFalse(isCardCached(cardId), "Кэш карты должен быть очищен");
-
-        mockMvc.perform(get("/api/cards/{id}", cardId))
+    void changeStatus_notFound_returns404() throws Exception {
+        mockMvc.perform(patch("/api/cards/{id}/status", 999999).with(asAdmin()).param("active", "true"))
                 .andExpect(status().isNotFound());
+    }
 
-        mockMvc.perform(get("/api/users/{id}/cards", userId))
-                .andExpect(status().isOk())
-                .andExpect(jsonPath("$.length()").value(0));
+    @Test
+    void deleteCard_returns204_andRemovesFromUser() throws Exception {
+        long userId = createUser("ivan@mail.com");
+        long cardId = createCard(userId, NUMBER);
+        mockMvc.perform(get("/api/users/{id}", userId).with(asAdmin()))
+                .andExpect(jsonPath("$.cards.length()").value(1));
+
+        mockMvc.perform(delete("/api/cards/{id}", cardId).with(asAdmin()))
+                .andExpect(status().isNoContent());
+
+        mockMvc.perform(get("/api/cards/{id}", cardId).with(asAdmin()))
+                .andExpect(status().isNotFound());
+        mockMvc.perform(get("/api/users/{id}", userId).with(asAdmin()))
+                .andExpect(jsonPath("$.cards.length()").value(0));
+    }
+
+    @Test
+    void deleteCard_notFound_returns404() throws Exception {
+        mockMvc.perform(delete("/api/cards/{id}", 999999).with(asAdmin()))
+                .andExpect(status().isNotFound());
     }
 }
